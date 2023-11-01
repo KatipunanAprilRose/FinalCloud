@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>Document</title>
+</head>
+<body>
+    <div>
+        <div style="text-align: center;">
+            <h2>FILE COMPRESSOR</h2>
+            <div style="height: 177px;
+            width: 800px;
+            border: 1px solid #1d7bff;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            background: #d7edfa61;
+            justify-content: center;
+            display: flex;
+            margin-left: auto;
+            margin-right: auto;">
+                <input type="file" id="fileInput" multiple style="height:25px; margin: auto;">
+            </div>
+            <button class="comButton" onclick="myFunction()">compress</button>
+        </div>
+    </div>
+    <script>
+        function myFunction(){
+            var filesInput = document.getElementById("fileInput")
+            var files = filesInput.files;
+
+            var zip = new JSZip();
+
+            for(var i = 0; i < files.length; i++){
+                var file = files[i];
+                zip.file(file.name, file)
+            }
+
+            zip.generateAsync({type:"blob"}).then(function(content){
+                saveAs(content, "file.zip")
+            });
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.js"></script>
+
+
+</body>
+
+</html>

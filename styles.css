@@ -1,0 +1,13 @@
+.comButton {
+    height:50px;
+    width: 177px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    background-color:#1D7BFF;
+}
+h2 {
+    margin-top: 50px;
+    margin-bottom: 40px;
+}
