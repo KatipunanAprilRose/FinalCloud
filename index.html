@@ -23,11 +23,18 @@
             margin-right: auto;">
                 <input type="file" id="fileInput" multiple style="height:25px; margin: auto;">
             </div>
-            <button class="comButton" onclick="myFunction()">compress</button>
+            <button class="comButton" onclick="">Upload</button>
+            <div class="dlFile">
+                <input class="dlInput" type="" placeholder="Enter file name" id="zipname">
+                <button class="dlButton" onclick="myFunction()"
+                    >Download
+                </button>
+            </div>
         </div>
     </div>
     <script>
         function myFunction(){
+            var zipName = document.getElementById("zipname").value;
             var filesInput = document.getElementById("fileInput")
             var files = filesInput.files;
 
@@ -39,7 +46,7 @@
             }
 
             zip.generateAsync({type:"blob"}).then(function(content){
-                saveAs(content, "file.zip")
+                saveAs(content, `${zipName}.zip`)
             });
         }
     </script>

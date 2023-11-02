@@ -1,5 +1,5 @@
 .comButton {
-    height:50px;
+    height:40px;
     width: 177px;
     border-radius: 10px;
     border: none;
@@ -10,4 +10,21 @@
 h2 {
     margin-top: 50px;
     margin-bottom: 40px;
+}
+.dlFile {
+    margin-top: 60px;
+}
+.dlInput{
+    height: 25px;
+    margin-left: -40px;
+}
+.dlButton{
+    height:40px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    background-color:#1D7BFF;     
+    margin-left: 30px;
+    width: 135px;           
 }
