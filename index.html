@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>Document</title>
+    <link rel="stylesheet" href="/public/stylesheets/style.css">
+    <title>Zip and Go</title>
 </head>
 <body>
     <div>
         <div style="text-align: center;">
-            <h2>FILE COMPRESSOR</h2>
+            <h2>Zip and Go</h2>
             <div style="height: 177px;
             width: 800px;
             border: 1px solid #1d7bff;
@@ -21,39 +21,47 @@
             display: flex;
             margin-left: auto;
             margin-right: auto;">
-                <input type="file" id="fileInput" multiple style="height:25px; margin: auto;">
+                <form id="uploadForm" enctype="multipart/form-data" action="/compress" method="POST">
+                    <input type="file" name="file" id="fileInput" accept=".txt, .csv, .jpg, .png, .pdf, .zip" multiple style="height: 25px; margin: auto;" />
             </div>
-            <button class="comButton" onclick="">Upload</button>
-            <div class="dlFile">
-                <input class="dlInput" type="" placeholder="Enter file name" id="zipname">
-                <button class="dlButton" onclick="myFunction()"
-                    >Download
-                </button>
-            </div>
+                    <button type="button" onclick="compressAndUpload()">Compress and Upload</button>
+                </form>
+            
+            <div id="result"></div>
         </div>
     </div>
     <script>
-        function myFunction(){
-            var zipName = document.getElementById("zipname").value;
-            var filesInput = document.getElementById("fileInput")
-            var files = filesInput.files;
+        async function compressAndUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('result');
+            const file = fileInput.files[0];
 
-            var zip = new JSZip();
-
-            for(var i = 0; i < files.length; i++){
-                var file = files[i];
-                zip.file(file.name, file)
+            if (!file) {
+                resultDiv.textContent = 'Please select a file to upload.';
+                return;
             }
 
-            zip.generateAsync({type:"blob"}).then(function(content){
-                saveAs(content, `${zipName}.zip`)
-            });
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/compress', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const url = await response.text();
+                    resultDiv.innerHTML = `<a href="${url}" download="${file.name}">Download Compressed File</a>`;
+                } else {
+                    const errorMessage = await response.text();
+                    resultDiv.textContent = `Error: ${errorMessage}`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.textContent = 'An error occurred while uploading the file.';
+            }
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.js"></script>
-
-
 </body>
-
 </html>
