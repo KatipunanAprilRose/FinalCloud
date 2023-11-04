@@ -48,7 +48,7 @@ app.post('/compress', upload.single('file'), (req, res) => {
   }
 
   // Create a user-specific SQS queue (if it doesn't exist)
-  const queueName = `user-queue-test${userId}`;
+  const queueName = `user-queue-test-${userId}`;
   const queueParams = {
     QueueName: queueName,
   };
@@ -93,7 +93,7 @@ app.post('/compress', upload.single('file'), (req, res) => {
           } else {
             console.log('File uploaded to S3:', s3Data.Location);
 
-            // Cleanup: Remove the temporary compressed file
+            // Cleanup: Remove the temporary compressed file and the original file
             fs.unlinkSync(compressedFilePath);
 
             fs.unlink(originalFilePath, (unlinkErr) => {
@@ -113,44 +113,6 @@ app.post('/compress', upload.single('file'), (req, res) => {
     });
   });
 });
-
-// Worker to process SQS messages for a specific user
-const processSqsMessage = (message) => {
-  const messageBody = JSON.parse(message.Body);
-  const originalFileName = messageBody.originalFileName;
-  const compressedFilePath = messageBody.compressedFilePath;
-
-  // Now, you can upload the compressed file to AWS S3
-  // Define the S3 parameters
-  const params = {
-    Bucket: bucketName,
-    Key: originalFileName + '.bz2', // Use the original filename
-    Body: fs.createReadStream(compressedFilePath),  // Use the compressed file
-  };
-
-  // Upload the compressed file to S3
-  s3.upload(params, (err, data) => {
-    if (err) {
-      console.error('Error uploading file to S3:', err);
-    } else {
-      console.log('File uploaded to S3:', data.Location);
-    }
-
-    // Delete the message from the SQS queue
-    const deleteParams = {
-      QueueUrl: message.EventSourceARN,
-      ReceiptHandle: message.ReceiptHandle,
-    };
-
-    sqs.deleteMessage(deleteParams, (err, data) => {
-      if (err) {
-        console.error('Error deleting message from SQS:', err);
-      } else {
-        console.log('Message deleted from SQS:', message.MessageId);
-      }
-    });
-  });
-};
 
 function generateUserId() {
   return Math.random().toString(36).substr(2, 9);
