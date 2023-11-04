@@ -24,16 +24,16 @@ var sqs = new AWS.SQS({apiVersion: '2012-11-05', region: "ap-southeast-2"});
 // Define S3 bucket name
 const bucketName = 'cloudproject83';
 
+const queueUrl = 'https://sqs.ap-southeast-2.amazonaws.com/901444280953/cloudproject83';
+
 // Handle file compression and upload
 app.post('/compress', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
 
-  //const userId = req.body.userId; // Include a unique user identifier, e.g., from a login system
-  const userId = req.query.userId || generateUserId();
   const originalFilePath = req.file.path;
-  let compressedFilePath; // Declare the variable here
+  let compressedFilePath; 
 
   // Use try-catch to handle errors during file compression
   try {
@@ -46,20 +46,6 @@ app.post('/compress', upload.single('file'), (req, res) => {
     // Handle errors during compression
     return res.status(500).send('Error during compression: ' + err.message);
   }
-
-  // Create a user-specific SQS queue (if it doesn't exist)
-  const queueName = `user-queue-test-${userId}`;
-  const queueParams = {
-    QueueName: queueName,
-  };
-
-  sqs.createQueue(queueParams, (err, data) => {
-    if (err) {
-      console.error('Error creating user-specific SQS queue:', err);
-      return res.status(500).send('Error creating user-specific SQS queue');
-    }
-
-    const queueUrl = data.QueueUrl;
 
     // Send a message to the user's SQS queue to handle the upload
     const message = {
@@ -112,7 +98,6 @@ app.post('/compress', upload.single('file'), (req, res) => {
       }
     });
   });
-});
 
 function generateUserId() {
   return Math.random().toString(36).substr(2, 9);
@@ -121,7 +106,7 @@ function generateUserId() {
 // Start listening to messages from the user's SQS queue
 sqs.on('ready', () => {
   console.log('SQS worker is ready and listening for user-specific messages.');
-  // Replace with your logic to process user-specific messages
+  // Replace with logic to process user-specific messages
 });
 
 app.get('/', (req, res) => {
