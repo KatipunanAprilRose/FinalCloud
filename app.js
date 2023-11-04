@@ -3,23 +3,23 @@ const bodyParser = require('body-parser');
 const AWS = require('aws-sdk');
 const CompressJS = require('compressjs');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const app = express();
+require("dotenv").config();
 
 app.use(bodyParser.json());
 
-// Initialize AWS S3 and SQS clients
+// Initialize AWS S3 and SQS
 const s3 = new AWS.S3({
-  // Configure AWS S3 credentials here
-  accessKeyId: 'ASIA5DYSEEJ465MAKDEB',
-  secretAccessKey: 'hD46OWv8xVfDbrmmfJNE2o0ZagBvrhd2XBwa460f',
-  sessionToken: 'IQoJb3JpZ2luX2VjEAgaDmFwLXNvdXRoZWFzdC0yIkgwRgIhAM5J2XSqTB3JdbUinH4pz7ak2a785a8h2N6hyiYf13QoAiEAjx7SuPpJ3GejMHm2cInj53BFJP8WyAwaRcFH6jyxKMEqpQMIQRADGgw5MDE0NDQyODA5NTMiDODTd/BxClAwKsFIpSqCA7VFAoTJn6ICoifzmA4nRgmIpgBSSvAk4JcY1mcDcGWP3TmxRC2p2Eg7470TM696wTXV9LAzAb9oYFy//oTxAi6CaIKQyzslDEUpseDwWpeUoN7sF7N+rzjLKvOwTHvR551rflHYqW39eTxuhQH87ZrenvZkGkfs71oyg5OZzNm85LrnxSYb4mK5tvoxpxZ7CrzBVluGC0YYJnW0nDdYn2esZvQScpxpOcn1or7J59XBe2Uj396RE8V8Q6gYG3I7qsN7MUUKKd1afo+OEnQwfkJuFlAtWMXpWUHnsLiYZo+3M6szqDaarf77FAqXmWF5iKdQo5wba7ivoMSu/38rJkbzeYtBBDKMKDHQF4gLoQb8RR6spLYh/uVziYKVji6DKJLo2H1cot9fXLSxR2aWhYu5sJxKUv8sh9/gWq1cKs4qInpjZMrxwxMN1qVJ9mq1nkLLZUppYhCGCbqWMrwV7WSIgxctisgaup9Ekl8Ssc7G7sIabas0JWh0/AeozQz5oAiPMPLJkqoGOqUBC0SKd49D2W+gOklRByzKnrNsAtLBWrEYNVrYN4gkauBcm0eqRtPOg6Rlu5N9DkQe06YTJE7lPYY60yIs1n9zW/05F8+RWqz31ci2xap2sWwblR4+KgYutG9QAObBRSH2qreHfTvsvj8gbF/S4MsfNKPneKG507wmjGYhU/3E7/lUAEknR9dW7B0yPPKBEwO7b8q2gRqVZEuN6+/JpmaWJ5g9Hqq9',
-  region: 'ap-southeast-2'
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  sessionToken: process.env.AWS_SESSION_TOKEN,
+  region: "ap-southeast-2",
 });
-const sqs = new AWS.SQS({ region: 'ap-southeast-2' });
+
+var sqs = new AWS.SQS({apiVersion: '2012-11-05', region: "ap-southeast-2"});
 
 // Define S3 bucket name
 const bucketName = 'cloudproject83';
@@ -30,6 +30,8 @@ app.post('/compress', upload.single('file'), (req, res) => {
     return res.status(400).send('No file uploaded.');
   }
 
+  //const userId = req.body.userId; // Include a unique user identifier, e.g., from a login system
+  const userId = req.query.userId || generateUserId();
   const originalFilePath = req.file.path;
   let compressedFilePath; // Declare the variable here
 
@@ -45,11 +47,84 @@ app.post('/compress', upload.single('file'), (req, res) => {
     return res.status(500).send('Error during compression: ' + err.message);
   }
 
+  // Create a user-specific SQS queue (if it doesn't exist)
+  const queueName = `user-queue-test${userId}`;
+  const queueParams = {
+    QueueName: queueName,
+  };
+
+  sqs.createQueue(queueParams, (err, data) => {
+    if (err) {
+      console.error('Error creating user-specific SQS queue:', err);
+      return res.status(500).send('Error creating user-specific SQS queue');
+    }
+
+    const queueUrl = data.QueueUrl;
+
+    // Send a message to the user's SQS queue to handle the upload
+    const message = {
+      originalFileName: req.file.originalname,
+      compressedFilePath: compressedFilePath,
+    };
+
+    const params = {
+      MessageBody: JSON.stringify(message),
+      QueueUrl: queueUrl,
+    };
+
+    sqs.sendMessage(params, (err, data) => {
+      if (err) {
+        console.error('Error sending message to SQS:', err);
+        res.status(500).send('Error sending message to SQS');
+      } else {
+        console.log('Message sent to SQS:', data.MessageId);
+
+        // Upload the compressed file to AWS S3
+        const s3Params = {
+          Bucket: bucketName,
+          Key: req.file.originalname + '.bz2', // Use the original filename
+          Body: fs.createReadStream(compressedFilePath), // Use the compressed file
+        };
+
+        s3.upload(s3Params, (s3Err, s3Data) => {
+          if (s3Err) {
+            console.error('Error uploading file to S3:', s3Err);
+            res.status(500).send('Error uploading file to S3');
+          } else {
+            console.log('File uploaded to S3:', s3Data.Location);
+
+            // Cleanup: Remove the temporary compressed file
+            fs.unlinkSync(compressedFilePath);
+
+            fs.unlink(originalFilePath, (unlinkErr) => {
+              if (unlinkErr) {
+                console.error('Error deleting the original uploaded file:', unlinkErr);
+              } else {
+                console.log('Original uploaded file deleted.');
+              }
+            });
+
+            // Return the S3 URL of the compressed file to the client
+            const s3Url = s3Data.Location;
+            res.status(200).send(s3Url);
+          }
+        });
+      }
+    });
+  });
+});
+
+// Worker to process SQS messages for a specific user
+const processSqsMessage = (message) => {
+  const messageBody = JSON.parse(message.Body);
+  const originalFileName = messageBody.originalFileName;
+  const compressedFilePath = messageBody.compressedFilePath;
+
   // Now, you can upload the compressed file to AWS S3
   // Define the S3 parameters
   const params = {
     Bucket: bucketName,
-    Key: req.file.originalname + '.bz2', // Use the original filename
+    Key: originalFileName + '.bz2', // Use the original filename
     Body: fs.createReadStream(compressedFilePath),  // Use the compressed file
   };
 
@@ -57,56 +132,34 @@ app.post('/compress', upload.single('file'), (req, res) => {
   s3.upload(params, (err, data) => {
     if (err) {
       console.error('Error uploading file to S3:', err);
-      res.status(500).send('Error uploading file to S3');
     } else {
       console.log('File uploaded to S3:', data.Location);
-
-      // Cleanup: Remove the temporary compressed file
-      fs.unlinkSync(compressedFilePath);
-
-      res.status(200).send(data.Location);
     }
-  });
-});
 
+    // Delete the message from the SQS queue
+    const deleteParams = {
+      QueueUrl: message.EventSourceARN,
+      ReceiptHandle: message.ReceiptHandle,
+    };
 
-
-// SQS Queue for handling compress requests
-app.post('/queue', (req, res) => {
-  const { filename, data } = req.body;
-
-  // Create a unique filename with a .zip extension
-  const zipFilename = `${uuidv4()}.zip`;
-
-  // Compress the file using compressjs
-  const zipData = CompressJS.LZString.compressToBase64(data);
-
-  // Create a writeable stream from the compressed data
-  const zipStream = new Buffer.from(zipData, 'base64');
-
-  // Define the S3 parameters
-  const params = {
-    Bucket: bucketName,
-    Key: zipFilename,
-    Body: zipStream,
-  };
-
-  // Send a message to SQS for processing
-  sqs.sendMessage(
-    {
-      QueueUrl: 'https://sqs.ap-southeast-2.amazonaws.com/901444280953/cloudproject83.fifo',
-      MessageBody: JSON.stringify(params),
-    },
-    (err, data) => {
+    sqs.deleteMessage(deleteParams, (err, data) => {
       if (err) {
-        console.error('Error sending message to SQS:', err);
-        res.status(500).send('Error sending message to SQS');
+        console.error('Error deleting message from SQS:', err);
       } else {
-        console.log('Message sent to SQS:', data.MessageId);
-        res.status(200).send(data.MessageId);
+        console.log('Message deleted from SQS:', message.MessageId);
       }
-    }
-  );
+    });
+  });
+};
+
+function generateUserId() {
+  return Math.random().toString(36).substr(2, 9);
+}
+
+// Start listening to messages from the user's SQS queue
+sqs.on('ready', () => {
+  console.log('SQS worker is ready and listening for user-specific messages.');
+  // Replace with your logic to process user-specific messages
 });
 
 app.get('/', (req, res) => {
