@@ -42,7 +42,7 @@ const processMessage = async (message) => {
       const compressedData = CompressJS.Bzip2.compressFile(fs.readFileSync(originalFilePath));
 
       // Use the original file name for the compressed file
-      compressedFilePath = path.join(__dirname, 'uploads', originalFileName + '_' + currentTimestamp + '.bz2');
+      compressedFilePath = path.join(__dirname, 'uploads', originalFileName + `_${currentTimestamp}.bz2`);
       fs.writeFileSync(compressedFilePath, compressedData);
     } catch (err) {
       // Handle errors during compression
@@ -51,7 +51,7 @@ const processMessage = async (message) => {
     // Upload the compressed file to AWS S3
     const s3Params = {
       Bucket: bucketName,
-      Key: originalFileName + '.bz2', // Use the original filename
+      Key: originalFileName + `_${currentTimestamp}.bz2`,
       Body: fs.createReadStream(compressedFilePath), // Use the compressed file
     };
 
@@ -64,7 +64,7 @@ const processMessage = async (message) => {
         zipS3Url = s3Data.Location;
         
         console.log(zipS3Url);
-        
+
         wss.clients.forEach(client => {
           if(client.readyState === Websocket.OPEN) {
             client.send(JSON.stringify({ zipS3Url }))
