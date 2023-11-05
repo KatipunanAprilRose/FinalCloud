@@ -1,14 +1,11 @@
 const express = require('express');
 const AWS = require('aws-sdk');
-const CompressJS = require('compressjs');
-const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const upload = multer({ dest: 'uploads/' });
 require("dotenv").config();
-const app = express();
 
+const app = express();
 app.use(express.json());
 
 const s3UrlQueue = []; // Shared queue to store S3 URLs

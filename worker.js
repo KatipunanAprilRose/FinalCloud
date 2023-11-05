@@ -2,8 +2,6 @@ const AWS = require('aws-sdk');
 const CompressJS = require('compressjs');
 const fs = require('fs');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
-const path = require('path');
 require("dotenv").config();
 const axios = require('axios');
 const currentTimestamp = new Date().getTime();
