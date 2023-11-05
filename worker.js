@@ -88,7 +88,7 @@ const processMessage = async (message) => {
     // Send the S3 URL to app.js
     axios.post('http://localhost:3000/store-s3-url', { s3Url })
       .then(response => {
-        console.log('S3 URL sent to app.js:', s3Url );
+        console.log('S3 URL sent to app.js:' );
       })
       .catch(error => {
         console.error('Error sending S3 URL to app.js:', error);

@@ -49,7 +49,7 @@ app.post('/compress', upload.single('file'), (req, res) => {
 app.post('/store-s3-url', (req, res) => {
   const s3Url = req.body.s3Url;
   s3UrlQueue.push(s3Url); // Push the S3 URL to the shared queue
-  res.status(200).send(s3Url);
+  res.status(200).send('ok');
 });
 
 app.get('/retrieve-s3-url', (req, res) => {

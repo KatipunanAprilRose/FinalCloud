@@ -80,55 +80,54 @@
                 });
 
                 if (response.ok) {
-                    verifyS3URLAvailable();
                     retrieveAndDisplayDownloadLink();
                 } else {
                     const errorMessage = await response.text();
                     resultDiv.textContent = `Error: ${errorMessage}`;
-                    
+
                 }
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 resultDiv.textContent = 'An error occurred while uploading the file.';
             }
         }
 
-        async function verifyS3URLAvailable ()
-        {
-            try {
-                const check = await fetch('/store-s3-url');
-                if (check.ok)
-                {
-                    const data = await check.text();
-                }
-            }
-            catch(error)
-            {
-                console.error('Error:', error);
-                resultDiv.textContent = 'An error occurred while saving the S3 URL.';
-            }
-        }
+
         async function retrieveAndDisplayDownloadLink() {
             const resultDiv = document.getElementById('result');
+            const pollingInterval = 2000;
+            const maxAttempts = 10;
 
-            try {
-                const response = await fetch('/retrieve-s3-url');
+            let attempts = 0;
+            const checkStatus = async () => {
+                try {
+                    const response = await fetch('/retrieve-s3-url');
 
-                if (response.ok) {
-                    const data = await response.json();
-                    const s3Url = data.s3Url;
+                    if (response.ok) {
+                        const data = await response.json();
+                        const s3Url = data.s3Url;
 
-                    console.log('S3 URL retrieved:', s3Url);
+                        console.log('S3 URL retrieved:', s3Url);
 
-                    resultDiv.innerHTML = `<a href="${s3Url}" download>Download Compressed File</a>`;
-                } else {
-                    resultDiv.textContent = 'S3 URL not available yet.';
+                        resultDiv.innerHTML = `<a href="${s3Url}" download>Download Compressed File</a>`;
+                    } else {
+                        if (attempts < maxAttempts) {
+                            // Continue polling if maxAttempts not reached
+                            attempts++;
+                            setTimeout(checkStatus, pollingInterval);
+                        } else {
+                            resultDiv.textContent = 'Max attempts reached. File not ready for download.';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    resultDiv.textContent = 'An error occurred while retrieving the S3 URL.';
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                resultDiv.textContent = 'An error occurred while retrieving the S3 URL.';
-            }
+            };
+
+            // Start the initial check
+            checkStatus();
         }
     </script>
 </body>
