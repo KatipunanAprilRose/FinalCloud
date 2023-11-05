@@ -42,24 +42,25 @@ app.post('/compress', upload.single('file'), (req, res) => {
       console.log('Message sent to SQS:', sqsData.MessageId);      
     }
   });
-
+  
+ res.send('ok');
 });
 
 app.post('/store-s3-url', (req, res) => {
   const s3Url = req.body.s3Url;
   s3UrlQueue.push(s3Url); // Push the S3 URL to the shared queue
-  res.send('S3 URL stored successfully.');
+  res.status(200).send(s3Url);
 });
 
 app.get('/retrieve-s3-url', (req, res) => {
   if (s3UrlQueue.length === 0) {
     res.status(404).send('S3 URL not available yet.');
   } else {
-    const s3Url = s3UrlQueue.shift(); // Retrieve and remove the first URL from the queue
-    
+    const s3Url = s3UrlQueue.shift(); // Retrieve and remove the first URL from the queue    
     res.json({ s3Url });
   }
 });
+
 
 app.use(express.static('public'));
 app.use('/css',express.static(__dirname+ 'public/css'));

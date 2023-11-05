@@ -1,53 +1,58 @@
-<!DOCTYPE html><head>
+<!DOCTYPE html>
+
+<head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="css/main.css">
     <title>Zip and Go</title>
-<html>
+    <html>
+
 <body>
     <nav>
-        <img src="img/logo.png" alt="logo"/>
-        <button class="navButton" type="button" onclick="document.getElementById('id01').style.display='block'">Log In</button>
+        <img src="img/logo.png" alt="logo" />
+        <button class="navButton" type="button" onclick="document.getElementById('id01').style.display='block'">Log
+            In</button>
     </nav>
-    <div id="id01" class="modal">  
-        <form class="modal-content animate" action="" method="post">      
+    <div id="id01" class="modal">
+        <form class="modal-content animate" action="" method="post">
             <div class="container">
                 <label for="username"><b>Username</b></label>
                 <input type="text" placeholder="Enter Username" name="username" required>
-        
+
                 <label for="password"><b>Password</b></label>
                 <input type="password" placeholder="Enter Password" name="password" required>
-                
+
                 <button type="submit">Login</button>
                 <label>
-                <input type="checkbox" checked="checked" name="remember"> Remember me
+                    <input type="checkbox" checked="checked" name="remember"> Remember me
                 </label>
             </div>
-      
+
             <div class="container" style="background-color:#f1f1f1">
-                <button type="button" onclick="document.getElementById('id01').style.display='none'" class="cancelbtn">Cancel</button>
+                <button type="button" onclick="document.getElementById('id01').style.display='none'"
+                    class="cancelbtn">Cancel</button>
             </div>
         </form>
-      </div>
-      
-      <script>
-      var modal = document.getElementById('id01');
-      
-      window.onclick = function(event) {
-          if (event.target == modal) {
-              modal.style.display = "none";
-          }
-      }
-      </script>
+    </div>
+
+    <script>
+        var modal = document.getElementById('id01');
+
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
     <div>
         <div class="heading">
             <h2>File Compressor</h2>
             <p>Upload the file you want to compress below.</p>
             <div class="UploadFile">
                 <form class="UploadForm" id="uploadForm" enctype="multipart/form-data" action="/compress" method="POST">
-                    <input type="file" name="file" id="fileInput" multiple style="height: 25px; margin: auto;" />           
+                    <input type="file" name="file" id="fileInput" multiple style="height: 25px; margin: auto;" />
                     <button class="comButton" type="button" onclick="compressAndUpload();">Compress and Upload</button>
                 </form>
             </div>
@@ -75,17 +80,57 @@
                 });
 
                 if (response.ok) {
-                    const url = await response.text();
-                    resultDiv.innerHTML = `<a href="${url}" download="${file.name}">Download Compressed File</a>`;
+                    verifyS3URLAvailable();
+                    retrieveAndDisplayDownloadLink();
                 } else {
                     const errorMessage = await response.text();
                     resultDiv.textContent = `Error: ${errorMessage}`;
+                    
                 }
+                
             } catch (error) {
                 console.error('Error:', error);
                 resultDiv.textContent = 'An error occurred while uploading the file.';
             }
         }
+
+        async function verifyS3URLAvailable ()
+        {
+            try {
+                const check = await fetch('/store-s3-url');
+                if (check.ok)
+                {
+                    const data = await check.text();
+                }
+            }
+            catch(error)
+            {
+                console.error('Error:', error);
+                resultDiv.textContent = 'An error occurred while saving the S3 URL.';
+            }
+        }
+        async function retrieveAndDisplayDownloadLink() {
+            const resultDiv = document.getElementById('result');
+
+            try {
+                const response = await fetch('/retrieve-s3-url');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const s3Url = data.s3Url;
+
+                    console.log('S3 URL retrieved:', s3Url);
+
+                    resultDiv.innerHTML = `<a href="${s3Url}" download>Download Compressed File</a>`;
+                } else {
+                    resultDiv.textContent = 'S3 URL not available yet.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.textContent = 'An error occurred while retrieving the S3 URL.';
+            }
+        }
     </script>
 </body>
+
 </html>

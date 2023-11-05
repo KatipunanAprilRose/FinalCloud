@@ -5,6 +5,7 @@ const multer = require('multer');
 require("dotenv").config();
 const axios = require('axios');
 const currentTimestamp = new Date().getTime();
+const path = require('path');
 
 const s3UrlQueue = [];
 
@@ -31,7 +32,7 @@ const compressFile = (originalFilePath, originalFileName) => {
   return new Promise((resolve, reject) => {
     try {
       const compressedData = CompressJS.Bzip2.compressFile(fs.readFileSync(originalFilePath));
-      const compressedFilePath = path.join(__dirname, 'uploads', originalFileName + `_${currentTimestamp}.bz2`);
+      const compressedFilePath = path.join(__dirname, 'uploads', originalFileName + `.bz2`);
       fs.writeFileSync(compressedFilePath, compressedData);
       resolve(compressedFilePath);
     } catch (error) {
@@ -42,7 +43,7 @@ const compressFile = (originalFilePath, originalFileName) => {
 
 const uploadToS3 = (compressedFilePath, originalFileName) => {
   return new Promise((resolve, reject) => {
-    const s3Key = originalFileName + `_${currentTimestamp}.bz2`;
+    const s3Key = `${currentTimestamp}_` + originalFileName + `.bz2`;
     const s3Params = {
       Bucket: bucketName,
       Key: s3Key,
