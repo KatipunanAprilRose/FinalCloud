@@ -4,11 +4,14 @@ const CompressJS = require('compressjs');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const bodyParser = require('body-parser');
 const upload = multer({ dest: 'uploads/' });
 require("dotenv").config();
 const app = express();
 
 app.use(express.json());
+
+const s3UrlQueue = []; // Shared queue to store S3 URLs
 
 // Initialize SQS
 const sqs = new AWS.SQS({
@@ -42,6 +45,23 @@ app.post('/compress', upload.single('file'), (req, res) => {
       console.log('Message sent to SQS:', sqsData.MessageId);      
     }
   });
+
+});
+
+app.post('/store-s3-url', (req, res) => {
+  const s3Url = req.body.s3Url;
+  s3UrlQueue.push(s3Url); // Push the S3 URL to the shared queue
+  res.send('S3 URL stored successfully.');
+});
+
+app.get('/retrieve-s3-url', (req, res) => {
+  if (s3UrlQueue.length === 0) {
+    res.status(404).send('S3 URL not available yet.');
+  } else {
+    const s3Url = s3UrlQueue.shift(); // Retrieve and remove the first URL from the queue
+    
+    res.json({ s3Url });
+  }
 });
 
 app.use(express.static('public'));

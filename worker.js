@@ -1,15 +1,14 @@
 const AWS = require('aws-sdk');
 const CompressJS = require('compressjs');
 const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
+const path = require('path');
 require("dotenv").config();
-const Websocket = require('ws');
+const axios = require('axios');
 const currentTimestamp = new Date().getTime();
 
-const wss = new Websocket.Server({ port:8080 });
-let zipS3Url = null;
+const s3UrlQueue = [];
 
 // Initialize AWS SQS and S3
 const sqs = new AWS.SQS({
@@ -56,7 +55,10 @@ const uploadToS3 = (compressedFilePath, originalFileName) => {
       if (s3Err) {
         reject(s3Err);
       } else {
-        resolve(s3Data.Location);
+        const s3Url = s3Data.Location;
+        console.log('S3 URL: ', s3Url);
+        s3UrlQueue.push(s3Url); // Push the S3 URL to the shared queue
+        resolve(s3Url);
       }
     });
   });
@@ -84,15 +86,19 @@ const processMessage = async (message) => {
       }
     });
 
-    // Now you can return the S3 URL or use it as needed
-    //console.log('S3 URL:', s3Url);
+    // Send the S3 URL to app.js
+    axios.post('http://localhost:3000/store-s3-url', { s3Url })
+      .then(response => {
+        console.log('S3 URL sent to app.js:', s3Url );
+      })
+      .catch(error => {
+        console.error('Error sending S3 URL to app.js:', error);
+      });
 
   } catch (error) {
     console.error('Error processing message:', error);
   }
 };
-
-
 
 // Poll the SQS queue for messages
 const pollQueue = () => {
