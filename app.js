@@ -1,75 +1,45 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const AWS = require('aws-sdk');
 const CompressJS = require('compressjs');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
-const app = express();
 require("dotenv").config();
+const app = express();
 
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Initialize AWS S3 and SQS
-const s3 = new AWS.S3({
+// Initialize SQS
+const sqs = new AWS.SQS({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   sessionToken: process.env.AWS_SESSION_TOKEN,
-  region: "ap-southeast-2",
+  region: 'ap-southeast-2',
 });
 
-// Define S3 bucket name
-const bucketName = 'cloudproject83';
+const sqsQueueURL = process.env.SQS_URL;
 
-// Handle file compression and upload
 app.post('/compress', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
 
-  const originalFilePath = req.file.path;
-  let compressedFilePath;
-
-  // Use try-catch to handle errors during file compression
-  try {
-    const compressedData = CompressJS.Bzip2.compressFile(fs.readFileSync(originalFilePath));
-
-    // Use the original file name for the compressed file
-    compressedFilePath = path.join(__dirname, 'uploads', req.file.originalname + '.bz2');
-    fs.writeFileSync(compressedFilePath, compressedData);
-  } catch (err) {
-    // Handle errors during compression
-    return res.status(500).send('Error during compression: ' + err.message);
-  }
-  // Upload the compressed file to AWS S3
-  const s3Params = {
-    Bucket: bucketName,
-    Key: req.file.originalname + '.bz2', // Use the original filename
-    Body: fs.createReadStream(compressedFilePath), // Use the compressed file
+  // Send a message to the SQS queue to process the compression
+  const messageParams = {
+    QueueUrl: sqsQueueURL,
+    MessageBody: JSON.stringify({
+      originalFilePath: req.file.path,
+      originalFileName: req.file.originalname,   
+    }),
   };
 
-  s3.upload(s3Params, (s3Err, s3Data) => {
-    if (s3Err) {
-      console.error('Error uploading file to S3:', s3Err);
-      res.status(500).send('Error uploading file to S3');
+  sqs.sendMessage(messageParams, (sqsErr, sqsData) => {
+    if (sqsErr) {
+      console.error('Error sending message to SQS:', sqsErr);
+      res.status(500).send('Error sending message to SQS');
     } else {
-      console.log('File uploaded to S3:', s3Data.Location);
-
-      // Cleanup: Remove the temporary compressed file and the original file
-      fs.unlinkSync(compressedFilePath);
-
-      fs.unlink(originalFilePath, (unlinkErr) => {
-        if (unlinkErr) {
-          console.error('Error deleting the original uploaded file:', unlinkErr);
-        } else {
-          console.log('Original uploaded file deleted.');
-        }
-      });
-
-      // Return the S3 URL of the compressed file to the client
-      const s3Url = s3Data.Location;
-      res.status(200).send(s3Url);
+      console.log('Message sent to SQS:', sqsData.MessageId);      
     }
   });
 });
