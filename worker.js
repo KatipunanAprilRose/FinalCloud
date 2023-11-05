@@ -30,59 +30,62 @@ const sqsQueueURL = process.env.SQS_URL;
 const bucketName = process.env.BUCKET_NAME;
 
 // Function to process messages from the SQS queue
+const compressFile = (originalFilePath, originalFileName) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const compressedData = CompressJS.Bzip2.compressFile(fs.readFileSync(originalFilePath));
+      const compressedFilePath = path.join(__dirname, 'uploads', originalFileName + `_${currentTimestamp}.bz2`);
+      fs.writeFileSync(compressedFilePath, compressedData);
+      resolve(compressedFilePath);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+const uploadToS3 = (compressedFilePath, originalFileName) => {
+  return new Promise((resolve, reject) => {
+    const s3Key = originalFileName + `_${currentTimestamp}.bz2`;
+    const s3Params = {
+      Bucket: bucketName,
+      Key: s3Key,
+      Body: fs.createReadStream(compressedFilePath),
+    };
+
+    s3.upload(s3Params, (s3Err, s3Data) => {
+      if (s3Err) {
+        reject(s3Err);
+      } else {
+        resolve(s3Data.Location);
+      }
+    });
+  });
+}
+
 const processMessage = async (message) => {
   try {
     const body = JSON.parse(message.Body);
     const { originalFilePath, originalFileName } = body;
 
-    let compressedFilePath;
+    // Compress the file
+    const compressedFilePath = await compressFile(originalFilePath, originalFileName);
 
-    // Use try-catch to handle errors during file compression
-    try {
-      const compressedData = CompressJS.Bzip2.compressFile(fs.readFileSync(originalFilePath));
-
-      // Use the original file name for the compressed file
-      compressedFilePath = path.join(__dirname, 'uploads', originalFileName + `_${currentTimestamp}.bz2`);
-      fs.writeFileSync(compressedFilePath, compressedData);
-    } catch (err) {
-      // Handle errors during compression
-      return res.status(500).send('Error during compression: ' + err.message);
-    }
     // Upload the compressed file to AWS S3
-    const s3Params = {
-      Bucket: bucketName,
-      Key: originalFileName + `_${currentTimestamp}.bz2`,
-      Body: fs.createReadStream(compressedFilePath), // Use the compressed file
-    };
+    const s3Url = await uploadToS3(compressedFilePath, originalFileName);
 
+    // Cleanup: Remove the temporary compressed file and original file
+    fs.unlinkSync(compressedFilePath);
 
-    s3.upload(s3Params, (s3Err, s3Data) => {
-      if (s3Err) {
-        console.error('Error uploading file to S3:', s3Err);
+    fs.unlink(originalFilePath, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error('Error deleting the original uploaded file:', unlinkErr);
       } else {
-        console.log('File uploaded to S3:', s3Data.Location);
-        zipS3Url = s3Data.Location;
-        
-        console.log(zipS3Url);
-
-        wss.clients.forEach(client => {
-          if(client.readyState === Websocket.OPEN) {
-            client.send(JSON.stringify({ zipS3Url }))
-          }
-        });
+        console.log('Original File: ' + originalFileName + ' DELETED.');
       }
-
-      // Cleanup: Remove the temporary compressed file and original file
-      fs.unlinkSync(compressedFilePath);
-      
-      fs.unlink(originalFilePath, (unlinkErr) => {
-        if (unlinkErr) {
-          console.error('Error deleting the original uploaded file:', unlinkErr);
-        } else {
-          console.log('Original File: ' + originalFileName + ' DELETED.');
-        }
-      });
     });
+
+    // Now you can return the S3 URL or use it as needed
+    //console.log('S3 URL:', s3Url);
 
   } catch (error) {
     console.error('Error processing message:', error);
@@ -90,12 +93,13 @@ const processMessage = async (message) => {
 };
 
 
+
 // Poll the SQS queue for messages
 const pollQueue = () => {
   const params = {
     QueueUrl: sqsQueueURL,
-    MaxNumberOfMessages: 10, // Adjust as needed
-    WaitTimeSeconds: 10, // Adjust as needed
+    MaxNumberOfMessages: 5,
+    WaitTimeSeconds: 20,
   };
 
   sqs.receiveMessage(params, (err, data) => {
