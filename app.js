@@ -39,14 +39,11 @@ app.post('/compress', upload.single('file'), (req, res) => {
   }
 
   // update database user transaction table path column
-  // add thhe key to path column
+  // add the key to path column
   if(req.session.user_id)
   {
-    query = `
-    UPDATE user_transaction
-    SET path = "${req.file.originalname + '.bz2'}"
-    WHERE id = "${req.session.user_id}"
-    `
+    //INSERT INTO user_files (filename, url, "${req.session.user_id}") VALUES ("${req.file.originalname + '.bz2'}", "SAMPLE", "${req.session.user_id}");
+    query = `INSERT INTO user_files (filename, url, id) VALUES ("${req.file.originalname + '.bz2'}", "SAMPLE", "${req.session.user_id}");`
 
     database.query(query, function (err, result) {
       if (err) throw err;
@@ -59,7 +56,8 @@ app.post('/compress', upload.single('file'), (req, res) => {
     QueueUrl: sqsQueueURL,
     MessageBody: JSON.stringify({
       originalFilePath: req.file.path,
-      originalFileName: req.file.originalname,   
+      originalFileName: req.file.originalname,
+
     }),
   };
 
@@ -76,8 +74,11 @@ app.post('/compress', upload.single('file'), (req, res) => {
 });
 
 app.post('/store-s3-url', (req, res) => {
-  const s3Url = req.body.s3Url;
-  s3UrlQueue.push(s3Url); // Push the S3 URL to the shared queue
+  const data = {
+    s3Url: req.body.s3Url,
+    filename: req.body.originalFileName,
+  };
+  s3UrlQueue.push(data); // Push the S3 URL to the shared queue
   res.status(200).send('ok');
 });
 
@@ -85,8 +86,8 @@ app.get('/retrieve-s3-url', (req, res) => {
   if (s3UrlQueue.length === 0) {
     res.status(404).send('S3 URL not available yet.');
   } else {
-    const s3Url = s3UrlQueue.shift(); // Retrieve and remove the first URL from the queue    
-    res.json({ s3Url });
+    const data = s3UrlQueue.shift(); // Retrieve and remove the first data from the queue    
+    res.json({ data });
   }
 });
 
@@ -112,7 +113,7 @@ app.post('/login', (request, response, next) => {
           {
             request.session.user_id = data[count].id;
             request.session.user_name = data[count].username;
-            request.session.path = data[count].path;
+            request.session.filename = data[count].filename;
             response.redirect("/");
           }
           else
@@ -135,10 +136,13 @@ app.post('/login', (request, response, next) => {
   }
 });
 
+
 app.get('/logout', function(request, response, next){
   request.session.destroy();
   response.redirect("/")
 })
+
+
 
 // static files
 app.use(express.static('public'));

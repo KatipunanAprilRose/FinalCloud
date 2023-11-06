@@ -49,10 +49,7 @@
         }
     </script>
     <% if(session.user_id){ %>
-        <h2> <%= session.user_name %></h2>
-        <h3  style="text-align: center;">you last compressed file</h3>
-        <h3 style="text-align: center;"> <%= session.path %></h3>
-     
+        <h2> <%= session.user_name %></h2>     
     <% } %>
     <div>
         <div class="heading">
@@ -114,7 +111,7 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        const s3Url = data.s3Url;
+                        const s3Url = data.data.s3Url;
 
                         console.log('S3 URL retrieved:', s3Url);
 
